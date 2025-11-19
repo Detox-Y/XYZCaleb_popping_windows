@@ -113,7 +113,7 @@ class TipApp:
             '但我们出生的那一刻就烙下的约定，我从来没有违背。',
             '意识也好，躯体也罢，即便这些都不复存在，我的灵魂也仍然会与你同频。',
             '说好了，生和死，都不再分开。',
-            '知道长大了,看你啊,有你自己的小世界了.'
+            '知道长大了,看你啊,有你自己的小世界了。'
         ]
 
         tip = random.choice(tips)
@@ -141,7 +141,7 @@ class TipApp:
         self.final_window.title('妹妹')
         self.final_window.configure(bg=BG_COLOR)
         self.final_window.attributes('-topmost', True, '-alpha', 0.95)
-        self.final_window.protocol("WM_DELETE_WINDOW", self.on_space_global)
+        self.final_window.protocol("WM_DELETE_WINDOW", self.on_final_close)
 
         window_width = 600
         window_height = 250
@@ -194,6 +194,62 @@ class TipApp:
         if self.root:
             self.root.quit()
         sys.exit()
+
+
+    def on_final_close(self, event=None):
+        """
+        关闭最后一个大窗口时：
+        1）停止 BGM
+        2）关闭当前大窗
+        3）弹出生日祝福窗口
+        """
+        # 停止 BGM（如果已经初始化）
+        try:
+            pygame.mixer.music.stop()
+        except:
+            pass
+
+        if self.final_window:
+            self.final_window.destroy()
+            self.final_window = None
+
+        self.show_birthday_window()
+
+
+    def show_birthday_window(self):
+        birthday_window = tk.Toplevel(self.root)
+        birthday_window.title('妹妹')
+        birthday_window.configure(bg=BG_COLOR)
+        birthday_window.attributes('-topmost', True, '-alpha', 0.95)
+        birthday_window.protocol("WM_DELETE_WINDOW", self.on_space_global)
+
+        window_width = 600
+        window_height = 250
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        x = (screen_width - window_width) // 2
+        y = (screen_height - window_height) // 2
+        birthday_window.geometry(f"{window_width}x{window_height}+{x}+{y}")
+
+        final_tip = "祝妹妹生日快乐 ^^"
+
+        label = tk.Label(
+            birthday_window,
+            text=final_tip,
+            bg=BG_COLOR,
+            fg=FG_COLOR,
+            font=('GenRyuMin', 25, 'bold'),
+            padx=30,
+            pady=30,
+            wraplength=550,
+            justify='center'
+        )
+        label.pack(expand=True, fill=tk.BOTH)
+
+        birthday_window.update_idletasks()
+        birthday_window.lift()
+
+
 
 
 if __name__ == '__main__':
