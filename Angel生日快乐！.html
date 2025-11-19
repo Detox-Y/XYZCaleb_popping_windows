@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>妹妹</title>
+  <link rel="icon" type="image/png" href="icon.png">
+  <style>
+    :root {
+      --bg-color: #151541;
+      --fg-color: #ed7638;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg-color);
+      color: var(--fg-color);
+      font-family: "GenRyuMin JP", "思源宋体 CN", "思源黑体 CN", "Microsoft YaHei", "微软雅黑", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      height: 100vh;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .overlay-full {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0);
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .window-base {
+      position: fixed;
+      background-color: var(--bg-color);
+      color: var(--fg-color);
+      border-radius: 12px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      z-index: 10;
+    }
+
+    .window-small {
+      width: 350px;
+      height: 120px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .window-big {
+      width: 600px;
+      height: 250px;
+      font-size: 24px;
+      line-height: 1.6;
+      padding: 30px;
+      font-weight: bold;
+    }
+
+    .window-titlebar {
+      position: absolute;
+      top: 6px;
+      left: 12px;
+      font-size: 13px;
+      opacity: 0.7;
+      user-select: none;
+    }
+
+    .window-close {
+      position: absolute;
+      top: 4px;
+      right: 8px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: none;
+      background: transparent;
+      color: var(--fg-color);
+      font-size: 16px;
+      line-height: 20px;
+      text-align: center;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .window-close:hover {
+      background: rgba(237, 118, 56, 0.2);
+    }
+
+    .window-text {
+      padding: 8px 12px;
+      max-width: 100%;
+      word-wrap: break-word;
+    }
+
+    .center-window {
+      /* 用 JS 设置 left / top */
+    }
+
+    .fade-in {
+      animation: fadeIn 0.15s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: scale(0.95);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="overlay-full"></div>
+
+  <audio id="bgm" src="Architect.mp3" loop></audio>
+
+  <script>
+    const BG_COLOR = "#151541";
+    const FG_COLOR = "#ed7638";
+
+    const tips = [
+      "好啊，那你需要什么？我都可以答应。",
+      "你想要回临空，我们就回临空",
+      "你想回到从前，我们就把老宅翻修，一起住过去",
+      "一座房子不够，那就给你建一座迷宫",
+      "我会在里面给你准备最好的一切，把它建成世界上最漂亮的花园",
+      "有我陪着你，以后他们就再也找不到你了。",
+      "一上大学就跟出笼的小鸟似的，这么久没回来，家里东西在哪都不记得了吧。",
+      "不许走，别留我一个人。",
+      "总是听不到你说想见我，我可以把它当作你想我的证据吗",
+      "我的弱点还要确认吗？",
+      "不需要……呵，好啊。只要你打得过我，我就信你不会被欺负。",
+      "来吧，让我看看我不在的时候你都学了些什么。",
+      "就你这个样子，还说不需要我？",
+      "搬离了家里，见识到外面的世界，就想把过去的一切都丢下不管了吗？",
+      "当年不是你先牵住我的手，让我做你的哥哥的吗？",
+      "现在你觉得自己长大了，就要松开这只手了吗？",
+      "我一直想要和你在同一边的世界，而不是只能看着你，想象你。",
+      "我们是同源而生，不管多少次，请唤醒我。",
+      "但我们出生的那一刻就烙下的约定，我从来没有违背。",
+      "意识也好，躯体也罢，即便这些都不复存在，我的灵魂也仍然会与你同频。",
+      "说好了，生和死，都不再分开。",
+      "知道长大了,看你啊,有你自己的小世界了。"
+    ];
+
+    const batchTotal = 100;      // 对应 create_batch_window(100)
+    let batchCreated = 0;
+    const popupWindows = [];
+    let singleWindowEl = null;
+    let finalWindowEl = null;
+    let birthdayWindowEl = null;
+
+    const bgm = document.getElementById("bgm");
+
+    function playBgm() {
+      bgm.volume = 1.0;
+      bgm.play().catch(err => {
+        console.log("BGM autoplay blocked, will play after user gesture.", err);
+      });
+    }
+
+    function stopBgm() {
+      try {
+        bgm.pause();
+        bgm.currentTime = 0;
+      } catch (e) {
+        console.log("Stop BGM error:", e);
+      }
+    }
+
+    function centerPosition(width, height) {
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const left = (vw - width) / 2;
+      const top = (vh - height) / 2;
+      return { left, top };
+    }
+
+    function createWindow({ big = false, text = "", onClose, title = "妹妹" }) {
+      const div = document.createElement("div");
+      div.classList.add("window-base", "fade-in");
+      div.classList.add(big ? "window-big" : "window-small");
+
+      // 标题
+      const titleBar = document.createElement("div");
+      titleBar.className = "window-titlebar";
+      titleBar.textContent = title;
+      div.appendChild(titleBar);
+
+      // 关闭按钮（叉）
+      const btn = document.createElement("button");
+      btn.className = "window-close";
+      btn.textContent = "×";
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        if (typeof onClose === "function") {
+          onClose(div);
+        }
+      };
+      div.appendChild(btn);
+
+      // 文本内容
+      const label = document.createElement("div");
+      label.className = "window-text";
+      label.textContent = text;
+      div.appendChild(label);
+
+      document.body.appendChild(div);
+      return div;
+    }
+
+    function showSingleTip() {
+      const w = 350;
+      const h = 120;
+      const { left, top } = centerPosition(w, h);
+
+      singleWindowEl = createWindow({
+        big: false,
+        text: "不需要我？",
+        onClose: () => {
+          if (singleWindowEl) {
+            singleWindowEl.remove();
+            singleWindowEl = null;
+          }
+          startBatchTips();
+        }
+      });
+
+      singleWindowEl.style.width = w + "px";
+      singleWindowEl.style.height = h + "px";
+      singleWindowEl.style.left = left + "px";
+      singleWindowEl.style.top = top + "px";
+      singleWindowEl.style.zIndex = 20;
+    }
+
+    function startBatchTips() {
+      playBgm();
+      batchCreated = 0;
+      createBatchWindow();
+    }
+
+    function createBatchWindow() {
+      if (batchCreated >= batchTotal) {
+        setTimeout(showFinalBigTip, 500);
+        return;
+      }
+
+      const w = 350;
+      const h = 120;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+
+      const left = Math.random() * (vw - w);
+      const top = Math.random() * (vh - h);
+
+      const text = tips[Math.floor(Math.random() * tips.length)];
+
+      const win = createWindow({
+        big: false,
+        text,
+        onClose: (div) => {
+          // 单个小窗被点叉：只关掉自己
+          div.remove();
+          const idx = popupWindows.indexOf(div);
+          if (idx !== -1) popupWindows.splice(idx, 1);
+        }
+      });
+
+      win.style.width = w + "px";
+      win.style.height = h + "px";
+      win.style.left = left + "px";
+      win.style.top = top + "px";
+      win.style.zIndex = 10 + batchCreated;
+
+      popupWindows.push(win);
+      batchCreated += 1;
+
+      setTimeout(createBatchWindow, 100);
+    }
+
+    function showFinalBigTip() {
+      const w = 600;
+      const h = 250;
+      const { left, top } = centerPosition(w, h);
+
+      finalWindowEl = createWindow({
+        big: true,
+        text: "说好了，生和死，都不再分开。",
+        onClose: () => {
+          onFinalClose();
+        }
+      });
+
+      finalWindowEl.style.width = w + "px";
+      finalWindowEl.style.height = h + "px";
+      finalWindowEl.style.left = left + "px";
+      finalWindowEl.style.top = top + "px";
+      finalWindowEl.style.zIndex = 999;
+      finalWindowEl.style.opacity = 0.95;
+    }
+
+    function onFinalClose() {
+      stopBgm();
+      if (finalWindowEl) {
+        finalWindowEl.remove();
+        finalWindowEl = null;
+      }
+      showBirthdayWindow();
+    }
+
+    function showBirthdayWindow() {
+      const w = 600;
+      const h = 250;
+      const { left, top } = centerPosition(w, h);
+
+      birthdayWindowEl = createWindow({
+        big: true,
+        text: "祝妹妹生日快乐 ^^",
+        onClose: () => {
+          onGlobalExit();
+        }
+      });
+
+      birthdayWindowEl.style.width = w + "px";
+      birthdayWindowEl.style.height = h + "px";
+      birthdayWindowEl.style.left = left + "px";
+      birthdayWindowEl.style.top = top + "px";
+      birthdayWindowEl.style.zIndex = 1000;
+      birthdayWindowEl.style.opacity = 0.95;
+    }
+
+    function onGlobalExit() {
+      stopBgm();
+
+      if (singleWindowEl) {
+        singleWindowEl.remove();
+        singleWindowEl = null;
+      }
+      popupWindows.forEach(div => div.remove());
+      popupWindows.length = 0;
+
+      if (finalWindowEl) {
+        finalWindowEl.remove();
+        finalWindowEl = null;
+      }
+      if (birthdayWindowEl) {
+        birthdayWindowEl.remove();
+        birthdayWindowEl = null;
+      }
+
+      // 结束后可以留个干净的暗色背景，或者加一行小字
+      const endMsg = document.createElement("div");
+      endMsg.style.position = "fixed";
+      endMsg.style.left = "50%";
+      endMsg.style.top = "50%";
+      endMsg.style.transform = "translate(-50%, -50%)";
+      endMsg.style.color = FG_COLOR;
+      endMsg.style.fontSize = "14px";
+      endMsg.style.opacity = "0.6";
+      endMsg.textContent = "（结束了。）";
+      document.body.appendChild(endMsg);
+    }
+
+    window.addEventListener("keydown", (e) => {
+      // 空格：全局“退出”（对应原来的 on_space_global）
+      if (e.code === "Space") {
+        e.preventDefault();
+        onGlobalExit();
+      }
+    });
+
+    window.addEventListener("load", () => {
+      showSingleTip();
+    });
+  </script>
+</body>
+</html>
